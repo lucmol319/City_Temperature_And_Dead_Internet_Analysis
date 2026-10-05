@@ -1,0 +1,314 @@
+---
+title: "Reddit Bot or Human Analysis"
+author: "Luc Molangi"
+date: "`r Sys.Date()`"
+output:
+  ioslides_presentation:
+    self_contained: false
+---
+<style type="text/css">
+body p, div, h1, h2, h3, h4, h5 {
+  color: #2C1A0E;
+  font-family: Modern Computer Roman;
+  font-size: 20px;
+}
+slides > slide.title-slide hgroup h1 {
+  color: #8C1D40;
+  font-size: 48px;
+}
+slides > slide.title-slide hgroup h2 {
+  color: #FFC627;
+  font-size: 20px;
+  margin-top: 10px;
+}
+slides > slide.title-slide {
+  background-color: #1A0A00;
+}
+h2 {
+  color: #8C1D40;
+  background: linear-gradient(to right, #FFF5E0, #FFFFFF);
+  padding: 10px;
+  border-left: 5px solid #FFC627;
+  font-size: 30px;
+}
+slides > slide {
+  background: linear-gradient(to bottom, #FFFAF0 0%, #FFFFFF 100%);
+}
+li {
+  font-size: 20px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+  color: #2C1A0E;
+  font-family: Modern Computer Roman;
+}
+p {
+  color: #2C1A0E;
+  font-family: Modern Computer Roman;
+}
+article {
+  color: #2C1A0E;
+  font-family: Modern Computer Roman;
+}
+strong {
+  color: #8C1D40;
+}
+code {
+  background-color: #FFF5E0;
+  color: #5C0A28;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 5
+)
+
+# Load required libraries
+library(ggplot2)
+library(plotly)
+library(dplyr)
+# Load the data
+internet <- read.csv("reddit_dead_internet_analysis_2026.csv")
+# Convert to factors for analysis
+internet$subreddit      <- factor(internet$subreddit)
+internet$is_bot_flag    <- factor(internet$is_bot_flag,
+                                  levels = c("False", "True"),
+                                  labels = c("Human", "Bot"))
+internet$bot_type_label <- factor(internet$bot_type_label,
+                                  levels = c("None (Human)",
+                                             "AI Summarizer",
+                                             "Engagement Farmer",
+                                             "Reprint Bot"))
+```
+
+## Dataset Overview and Source
+
+**Reddit "Dead Internet" Comment Dataset (2026)**
+
+This analysis examines data from 500 records of synthetic Reddit comment metadata generated to simulate the "Dead Internet" environment of 2026.
+
+**Data Source:** Kaggle — [nudratabbas/the-dead-internet-theory-reddit-bot-vs-human](https://www.kaggle.com/datasets/nudratabbas/the-dead-internet-theory-reddit-bot-vs-human)
+
+**Key Variables:**
+
+- **subreddit:** Community where comment was posted (ex: r/funny, r/gaming)
+- **account_age_days:** Account maturity and reputation signals
+- **reply_delay_seconds:** Time from post to comment — instant replies suggest automation
+- **is_bot_flag:** Ground-truth label — **Bot** (218) or **Human** (282)
+- **bot_type_label:** Bot sub-type — AI Summarizer, Engagement Farmer, Reprint Bot, or None (Human)
+- **bot_probability:** Model-estimated probability of being a bot (0–1)
+
+## R Code for Data Preparation
+
+Here's how the data is loaded and prepared for analysis:
+```{r data-prep, eval=FALSE, echo=TRUE}
+# Code is visible but does not run twice; Load required libraries
+library(ggplot2)
+library(plotly)
+library(dplyr)
+# Load the data from local CSV
+internet <- read.csv("reddit_dead_internet_analysis_2026.csv")
+# Convert categorical columns to factors
+internet$subreddit      <- factor(internet$subreddit)
+internet$is_bot_flag    <- factor(internet$is_bot_flag,
+                                  levels = c("False", "True"),
+                                  labels = c("Human", "Bot"))
+internet$bot_type_label <- factor(internet$bot_type_label,
+                                  levels = c("None (Human)",
+                                             "AI Summarizer",
+                                             "Engagement Farmer",
+                                             "Reprint Bot"))
+```
+
+## 3D Plotly: Account Age, Reply Delay, and Word Length
+
+```{r}
+plot_ly(data = internet,
+        x = ~account_age_days,
+        y = ~reply_delay_seconds,
+        z = ~avg_word_length,
+        type = "scatter3d",
+        mode = "markers",
+        color = ~is_bot_flag,
+        colors = c("Human" = "#FFC627", "Bot" = "#8C1D40"),
+        marker = list(size = 4, opacity = 0.8)) %>%
+  layout(
+    title = "3D View: Account Age, Reply Delay & Word Length by Bot Status",
+    scene = list(
+      xaxis = list(title = "Account Age (days)"),
+      yaxis = list(title = "Reply Delay (seconds)"),
+      zaxis = list(title = "Avg Word Length (chars)")
+    ),
+    legend = list(title = list(text = "User Type")),
+    paper_bgcolor = "#FFFAF0",
+    plot_bgcolor  = "#FFFAF0"
+  )
+```
+
+## 3D Plot Analysis
+
+**Key Observations:**
+
+- **X-Axis Account Age:** Bots average 759 days, humans 1,466 days. Bot points concentrate toward the left at low account age values, reflecting that most bots operate on newly created accounts, while human points spread across the range.
+
+- **Y-Axis Reply Delay:** TBots cluster tightly at near-zero reply delay as they average 6 seconds while humans spread broadly from hundreds to thousands of seconds at an average  of 1,823 seconds, creating an almost complete separation on the Y-axis.
+
+- **Z-Axis Average Word Length:** Bots average 6.44 chars/word, while humans cluster in the lower range at 5.05, reflecting the more formal vocabulary patterns of AI-generated text.
+
+- **Combined Effect:** Bots will cluster tightly near the bottom of the Y-axis (near-zero reply delay) and upwards on Z (longer words), while humans spread out — making the separation visually intuitive even in 3D
+
+## Plotly Grouped Bar: Bot vs Human Count by Subreddit
+
+```{r}
+internet %>%
+  count(subreddit, is_bot_flag) %>%
+  plot_ly(x = ~subreddit, y = ~n, color = ~is_bot_flag,
+          colors = c("Human" = "#FFC627", "Bot" = "#8C1D40"),
+          type = "bar") %>%
+  layout(
+    barmode = "group",
+    title = "Bot vs Human Comment Counts by Subreddit",
+    xaxis = list(title = "Subreddit"),
+    yaxis = list(title = "Number of Comments"),
+    legend = list(title = list(text = "User Type")),
+    paper_bgcolor = "#FFFAF0",
+    plot_bgcolor  = "#FFFAF0"
+  )
+```
+
+## ggplot Boxplot: Reply Delay by Subreddit and Bot Status
+
+```{r}
+ggplot(internet, aes(x = subreddit, y = reply_delay_seconds,
+                     fill = is_bot_flag)) +
+  geom_boxplot(outlier.size = 1.5, outlier.alpha = 0.5) +
+  scale_y_log10(labels = scales::comma) +
+  scale_fill_manual(values = c("Human" = "#FFC627", "Bot" = "#8C1D40")) +
+  labs(
+    title = "Reply Delay by Subreddit and Bot Status",
+    x = "Subreddit",
+    y = "Reply Delay in Seconds (log scale)",
+    fill = "User Type"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.background  = element_rect(fill = "#FFFAF0", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.grid.major = element_line(color = "#FFE5A0"),
+    panel.grid.minor = element_line(color = "#FFF5D0"),
+    strip.background = element_rect(fill = "#FFF5E0", color = "#FFC627"),
+    strip.text       = element_text(color = "#8C1D40", face = "bold"),
+    text             = element_text(size = 13)
+  )
+```
+
+## ggplot Faceted Scatterplot: Account Age vs Word Length by Bot Type
+
+```{r}
+ggplot(internet, aes(x = account_age_days, y = avg_word_length,
+                     color = bot_probability)) +
+  geom_point(alpha = 0.7, size = 2) +
+  scale_color_gradient(low = "#FFC627", high = "#8C1D40",
+                       name = "Bot Probability") +
+  facet_wrap(~ bot_type_label, ncol = 2) +
+  labs(
+    title = "Account Age vs Word Length by Bot Type",
+    x = "Account Age (days)",
+    y = "Avg Word Length (chars)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.background  = element_rect(fill = "#FFFAF0", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.grid.major = element_line(color = "#FFE5A0"),
+    panel.grid.minor = element_line(color = "#FFF5D0"),
+    strip.background = element_rect(fill = "#FFF5E0", color = "#FFC627"),
+    strip.text       = element_text(color = "#8C1D40", face = "bold", size = 11),
+    text             = element_text(size = 13)
+  )
+```
+
+## Statistical Analysis: Summary Statistics {.smaller}
+
+```{r echo=TRUE}
+internet %>%
+  group_by(is_bot_flag) %>%
+  summarise(
+    Count         = n(),
+    Mean_Age      = round(mean(account_age_days), 1),
+    Median_Age    = round(median(account_age_days), 1),
+    Mean_Delay    = round(mean(reply_delay_seconds), 1),
+    Median_Delay  = round(median(reply_delay_seconds), 1),
+    Mean_WordLen  = round(mean(avg_word_length), 2),
+    SD_WordLen    = round(sd(avg_word_length), 2)
+  )
+```
+
+## Summary Statistics: Interpretation
+
+**Detailed Findings:**
+
+- **Balanced Dataset:** With 282 humans versus 218 bots, the sample sizes are not the most balanced, but they can still provide a solid foundation for reliable statistical comparisons.
+
+- **Reply Delay is the strongest signal:** Humans average 1,823 seconds (around 30 min) to reply versus bots at just 6 seconds — over 300 times difference in means and a 293x difference in medians (1,757s vs 6s), making this the single most discriminating variable in the dataset.
+
+- **Account Age exposes throwaway bots:** Human accounts have a median age of 1,419 days (~4 years) compared to just 120 days for bots, revealing that the majority of bots operate on recently created accounts to avoid leaving a behavioral history.
+
+- **Word Length is a consistent linguistic tell:** Bots average 6.44 characters per word versus 5.05 for humans, with nearly no overlap in range (bots: 5.5–7.5, humans: 4.0–6.0). AI-generated text consistently favors longer, more formal vocabulary.
+
+## Statistical Analysis: T-Test {.smaller}
+
+```{r}
+# T-test 1: Average Word Length (symmetric distributions, well-suited for t-test)
+t.test(avg_word_length ~ is_bot_flag, data = internet)
+
+# T-test 2: Reply Delay (most dramatic behavioral difference)
+t.test(reply_delay_seconds ~ is_bot_flag, data = internet)
+```
+
+## T-Test: Interpretation
+
+**Comprehensive Analysis:**
+
+- **Statistical Significance:** The p-value is essentially zero, meaning the difference in average word length between humans (5.05) and bots (6.44) is overwhelmingly unlikely to be due to chance.
+
+- **Effect Size:** The 1.39 character gap is consistent and meaningful — bot-generated text reliably uses longer, more formal vocabulary, likely reflecting AI language patterns from training data. A difference of ~1,817 seconds (~30 minutes) in mean reply time. Bots respond near-instantly; no human reflexively replies within 10 seconds.
+
+- **Confidence Interval:** The true mean difference is between 1,697s and 1,937s with 95% confidence — an enormous and precise gap. We are 95% confident the true difference in means falls between 1.29 and 1.49 characters, a very tight interval that reflects high precision from the large sample.
+
+## Key Insights and Conclusions
+
+**Major Findings:**
+
+**First — Bots have a consistent behavioral fingerprint:** Across every subreddit, bots are characterized by near-instant replies, young accounts, and longer-than-average word lengths. The combination of all three is definitive, but even reply delay alone separates the groups almost perfectly.
+
+**Second — Linguistic patterns betray AI authorship:** The 1.39 character gap in average word length, confirmed by t-test, reflects how large language models favor formal vocabulary. This signal persists even when bots successfully mimic karma and posting frequency.
+
+**Third — Karma farming is effective camouflage:** Bot karma distributions are nearly identical to human ones, meaning reputation-based detection alone would fail entirely. Effective detection requires behavioral timing and linguistic analysis working together.
+
+## Implications and Future Directions
+
+**Practical Application:** Platform moderation could implement real-time reply delay thresholds — any account responding consistently under 15 seconds across multiple posts warrants automated review, regardless of karma or account age.
+
+**Study Limitations:** 
+
+- This dataset is synthetic, meaning bot behavior patterns were designed to be detectable.
+- Real-world bots may deliberately introduce reply delay variation or word length noise to evade these exact signals. Results should be validated against live Reddit data before operational deployment.
+
+**Future Research Directions:**
+
+- Longitudinal studies tracking whether bot account age distributions shift as platforms improve new-account detection.
+- NLP analysis of full comment text beyond average word length to identify deeper stylistic signatures of AI-generated content.
+- Cross-platform comparison to determine whether these behavioral fingerprints generalize beyond Reddit.
+
+## Thank You
+
+**Dataset Source:** Kaggle — nudratabbas/the-dead-internet-theory-reddit-bot-vs-human
+
+[https://www.kaggle.com/datasets/nudratabbas/the-dead-internet-theory-reddit-bot-vs-human]
+
+**Tools Used:** R, ggplot2, plotly, dplyr
